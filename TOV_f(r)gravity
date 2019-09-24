@@ -1,0 +1,68 @@
+import time
+start = time.time()   # to calculate the runtime of the program
+
+import math
+import csv
+import matplotlib.pyplot as plt
+#%matplotlib inline
+import numpy
+import array as arr
+
+
+a, b, c, d = numpy.loadtxt('eos_np_s0t.dat', delimiter=' ',unpack=True) #eos_np_s0t.dat contains tabulated Equation of State(EoS)
+
+energyD = c*(1.3234e-6)  # in MeVfm-3 from the dataset to km-2
+pressureD = d*(1.3234e-6) # in MeVfm-3 from the dataset to km-2
+
+msun = 1.4766 #mass of sun (in km)
+
+for i in range(0, len(a)-1):
+    pi          = 3.141592653589793
+    mass        = 0.0                  #mass of the star (initial value)
+    radius      = 1.0e-5               #radius of the star in km (initial value)
+    alpha       = 1
+    energy      = (1+alpha/10)*energyD[i] #energy in Km-2; we can make the perturbed quantity as small as we want dividing it by appropriate number
+    pressure    = (1+alpha/10)*pressureD[i]  #pressure in Km-2
+    dr          = 0.001
+
+    
+    while pressure > pressureD[0]: 
+        ricci       = 8*pi*(energy - 3*pressure)
+        rc          = pressure         #currently using "pressure" to check if the program is running
+        h           = ricci*(math.exp(-ricci/rc)-1)                                 #f(R) model
+        hR          = math.exp(-ricci/rc)-((ricci/rc)*(math.exp(-ricci/rc))) - 1
+        dhR         = 0.001
+        ddhR        = 0.001
+               
+        dm1 = 4.0*pi*energy*(radius**2)
+        dm2 = alpha*radius**2*(4.0*pi*energy*hR+(1/4*(h-ricci*hR)))
+        dm3 = alpha*((2*radius-3*mass-4.0*pi*energy*radius**3)*dhR+(radius*(radius-2.0*mass)*ddhR))/2
+                
+        dp1 = (energy+pressure)/(radius-2.0*mass)
+        dp2 = ((mass/radius)+(4.0*pi*pressure*radius**2))
+        dp3 = alpha*(radius**2)*(4.0*pi*pressure*hR+(1/4*(h-ricci*hR)))
+        dp4 = alpha*((radius-(3*mass)+(2.0*pi*pressure*(radius**3)))*dhR) 
+        
+        dm = (dm1-dm2+dm3)*dr
+        dp = -dp1*(dp2-dp3-dp4)*dr
+        dri = 8*pi*(dm - 3*dp)
+        
+        hr          = math.exp(-ricci/rc)*(dri/dr*rc)*((ricci/rc)-2) #derivative of hR wrt r
+        
+        ricci       = ricci+dri
+        pressure    = pressure+dp
+        mass        = mass+dm
+        radius      = radius+dr
+        dhR         = dhR+(hr*dr)
+        ddhR        = ddhR+(hr*dr*dr)
+        
+        for j in range(0, i):  #piecewise interpolation of energy and pressure
+            if pressureD[j]>pressure:
+                break
+            energy = energyD[j]+(energyD[j+1]-energyD[j])*(pressure-pressureD[j])/(pressureD[j+1]-pressureD[j])
+        
+    print (i, radius, mass/msun)
+
+
+end = time.time()
+print('runtime =', end - start, 'seconds')
